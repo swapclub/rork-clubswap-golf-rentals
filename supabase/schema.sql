@@ -293,6 +293,16 @@ CREATE TABLE conversations (
     last_message_at TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(participant_1_id, participant_2_id, listing_id)
+);
+
+-- Messages table
+CREATE TABLE messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES profiles(id),
+    recipient_id UUID NOT NULL REFERENCES profiles(id),
+    booking_id UUID REFERENCES bookings(id),
+    listing_id UUID REFERENCES listings(id),
 
     -- Message content
     content TEXT NOT NULL CHECK (char_length(content) <= 1000),
@@ -514,6 +524,7 @@ CREATE INDEX idx_messages_conversation ON messages(conversation_id, created_at D
 CREATE INDEX idx_messages_sender ON messages(sender_id);
 CREATE INDEX idx_messages_recipient ON messages(recipient_id);
 CREATE INDEX idx_messages_unread ON messages(recipient_id, is_read) WHERE is_read = FALSE;
+CREATE INDEX idx_conversations_participants ON conversations(participant_1_id, participant_2_id);
 
 -- Reviews
 CREATE INDEX idx_reviews_booking ON reviews(booking_id);
@@ -549,6 +560,7 @@ ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verification_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE golf_courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 
 -- Golf courses policies 
 CREATE POLICY "Golf courses are viewable by everyone"
@@ -631,6 +643,14 @@ CREATE POLICY "Users can send messages"
 CREATE POLICY "Users can update their sent messages"
     ON messages FOR UPDATE
     USING (auth.uid() = sender_id);
+
+CREATE POLICY "Users can view their conversations"
+    ON conversations FOR SELECT
+    USING (auth.uid() = participant_1_id OR auth.uid() = participant_2_id);
+
+CREATE POLICY "Users can create conversations"
+    ON conversations FOR INSERT
+    WITH CHECK (auth.uid() = participant_1_id OR auth.uid() = participant_2_id);
 
 -- Reviews policies
 CREATE POLICY "Published reviews are viewable by everyone"
