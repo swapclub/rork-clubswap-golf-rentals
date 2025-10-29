@@ -27,6 +27,22 @@ CREATE TYPE notification_channel AS ENUM ('push', 'email', 'sms');
 -- CORE TABLES
 -- ============================================================================
 
+-- Golf courses directory
+CREATE TABLE golf_courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    city TEXT NOT NULL,
+    province TEXT NOT NULL,
+    postal_code TEXT,
+    country TEXT DEFAULT 'Canada',
+    location GEOGRAPHY(Point, 4326) NOT NULL, -- PostGIS point for lat/lng
+    phone TEXT,
+    website TEXT,
+    holes INTEGER DEFAULT 18,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Profiles table (extends Supabase auth.users)
 CREATE TABLE profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -68,22 +84,6 @@ CREATE TABLE profiles (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     last_active_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Golf courses directory
-CREATE TABLE golf_courses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
-    address TEXT NOT NULL,
-    city TEXT NOT NULL,
-    province TEXT NOT NULL,
-    postal_code TEXT,
-    country TEXT DEFAULT 'Canada',
-    location GEOGRAPHY(Point, 4326) NOT NULL, -- PostGIS point for lat/lng
-    phone TEXT,
-    website TEXT,
-    holes INTEGER DEFAULT 18,
-    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Listings table
@@ -284,14 +284,15 @@ CREATE TABLE payout_accounts (
     onboarding_completed_at TIMESTAMPTZ
 );
 
--- Messages table
-CREATE TABLE messages (
+CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    conversation_id UUID NOT NULL,
-    sender_id UUID NOT NULL REFERENCES profiles(id),
-    recipient_id UUID NOT NULL REFERENCES profiles(id),
-    booking_id UUID REFERENCES bookings(id),
     listing_id UUID REFERENCES listings(id),
+    booking_id UUID REFERENCES bookings(id),
+    participant_1_id UUID NOT NULL REFERENCES profiles(id),
+    participant_2_id UUID NOT NULL REFERENCES profiles(id),
+    last_message_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(participant_1_id, participant_2_id, listing_id)
 
     -- Message content
     content TEXT NOT NULL CHECK (char_length(content) <= 1000),
@@ -494,6 +495,7 @@ CREATE INDEX idx_listings_rating ON listings(average_rating DESC);
 CREATE INDEX idx_listings_price ON listings(daily_rate);
 CREATE INDEX idx_listings_created ON listings(created_at DESC);
 CREATE INDEX idx_listings_instant_booking ON listings(instant_booking) WHERE instant_booking = TRUE;
+CREATE INDEX idx_availability_listing_dates ON availability_windows(listing_id, start_date, end_date);
 
 -- Golf courses
 CREATE INDEX idx_golf_courses_location ON golf_courses USING GIST(location);
@@ -546,6 +548,12 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verification_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE golf_courses ENABLE ROW LEVEL SECURITY;
+
+-- Golf courses policies 
+CREATE POLICY "Golf courses are viewable by everyone"
+    ON golf_courses FOR SELECT
+    USING (true);
 
 -- Profiles policies
 CREATE POLICY "Public profiles are viewable by everyone"
