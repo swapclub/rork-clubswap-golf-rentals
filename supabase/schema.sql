@@ -758,29 +758,20 @@ CREATE POLICY "Users can manage their own verification documents"
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+SET search_path = public
+AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Apply updated_at trigger to relevant tables
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_listings_updated_at BEFORE UPDATE ON listings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON bookings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_disputes_updated_at BEFORE UPDATE ON disputes
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 -- Function to create profile on user signup
 CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = public
+AS $$
 BEGIN
     INSERT INTO profiles (id, email, first_name, last_name)
     VALUES (
@@ -797,19 +788,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to create profile on signup
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION handle_new_user();
-
 -- Function to calculate distance between two points
 CREATE OR REPLACE FUNCTION calculate_distance(lat1 FLOAT, lng1 FLOAT, lat2 FLOAT, lng2 FLOAT)
-RETURNS FLOAT AS $$
+RETURNS FLOAT
+SET search_path = public
+AS $$
 BEGIN
     RETURN ST_Distance(
         ST_MakePoint(lng1, lat1)::geography,
         ST_MakePoint(lng2, lat2)::geography
-    ) / 1000; -- Convert meters to kilometers
+    ) / 1000;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -833,7 +821,9 @@ CREATE OR REPLACE FUNCTION search_listings(
 RETURNS TABLE (
     listing_id UUID,
     distance_km FLOAT
-) AS $$
+)
+SET search_path = public
+AS $$
 BEGIN
     RETURN QUERY
     SELECT
