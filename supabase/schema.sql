@@ -618,6 +618,48 @@ CREATE POLICY "Owners can manage their listing photos"
         )
     );
 
+-- Availability windows policies
+CREATE POLICY "Users can view availability for active listings"
+    ON availability_windows FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM listings
+            WHERE listings.id = availability_windows.listing_id
+            AND (listings.is_active = true OR listings.owner_id = auth.uid())
+        )
+    );
+
+CREATE POLICY "Owners can manage their listing availability"
+    ON availability_windows FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM listings
+            WHERE listings.id = availability_windows.listing_id
+            AND listings.owner_id = auth.uid()
+        )
+    );
+-- Payments policies
+CREATE POLICY "Users can view their own payment records"
+    ON payments FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "System can create payment records"
+    ON payments FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- Disputes policies
+CREATE POLICY "Involved parties can view disputes"
+    ON disputes FOR SELECT
+    USING (auth.uid() = initiator_id OR auth.uid() = respondent_id);
+
+CREATE POLICY "Users can create disputes for their bookings"
+    ON disputes FOR INSERT
+    WITH CHECK (auth.uid() = initiator_id);
+
+CREATE POLICY "Involved parties can update disputes"
+    ON disputes FOR UPDATE
+    USING (auth.uid() = initiator_id OR auth.uid() = respondent_id);
+
 -- Bookings policies
 CREATE POLICY "Users can view their own bookings"
     ON bookings FOR SELECT
